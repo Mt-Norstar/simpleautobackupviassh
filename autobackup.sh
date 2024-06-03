@@ -1,20 +1,20 @@
 #!/bin/bash
 
 # Variables
-REMOTE_USER="username"
-REMOTE_HOST="HOST_IP"
-REMOTE_WEB_DIR="REMOTE_SITE_FILE_PATH" # i.e. /domain/site/sitedirectory
-REMOTE_DB1="SITE_DB_NAME"
-LOCAL_BACKUP_BASE_DIR="FILE_PATH_WHERE_YOU_ARE_BACKING_UP_TO"
-REMOTE_BACKUP_DIR="REMOTE_SITE_FILE_PATH_BASE" #i.e. /domain/site (may be same as REMOTE_WEB_DIR)
-DATE=$(date +'%Y-%m-%d')
-BACKUP_DIR="${LOCAL_BACKUP_BASE_DIR}/SITE_BACKUP_${DATE}"
-SSH_PASS="SSH_PASSWORD"
-DB_USERNAME="SITE_DB_USERNAME"
-DB_PASS="SITE_DB_PASSWORD"
-SSH_PORT=SSH_PORT_#
-LOG_FILE="${LOCAL_BACKUP_BASE_DIR}/backup_log_${DATE}.log"
-SSH_OPTIONS="SSH_OPTIONS -p ${SSH_PORT}"
+REMOTE_USER="username" #Your ssh username
+REMOTE_HOST="HOST_IP" #Your Host IP address
+REMOTE_WEB_DIR="REMOTE_SITE_FILE_PATH" # i.e. /domain/site/sitedirectory this is the whole directory on the remote serever that will be zipped!
+REMOTE_DB1="SITE_DB_NAME" #DB Name, this is the DB that we will create a dump of and that the script downloads
+LOCAL_BACKUP_BASE_DIR="BASE_FILE_PATH_WHERE_YOU_ARE_BACKING_UP_TO" #this is the base local directory where the $BACKUP_DIR is created, your files are stored within the $BACKUP_DIR
+REMOTE_BACKUP_DIR="REMOTE_SITE_FILE_PATH_BASE" #i.e. /domain/site this is the directory on the remote server where your .zip file and the .sql db dump file will be stored
+DATE=$(date +'%Y-%m-%d') #Date 
+BACKUP_DIR="${LOCAL_BACKUP_BASE_DIR}/SITE_BACKUP_${DATE}" #this is the directory that is made by the script where your files will be stored
+SSH_PASS="SSH_PASSWORD" #ssh password
+DB_USERNAME="SITE_DB_USERNAME" #DB Username
+DB_PASS="SITE_DB_PASSWORD" #DB Password
+SSH_PORT=SSH_PORT_ #ssh port number
+LOG_FILE="${LOCAL_BACKUP_BASE_DIR}/backup_log_${DATE}.log" #Log file created by script that logs actions and errors
+SSH_OPTIONS="SSH_OPTIONS -p ${SSH_PORT}" #Any specific ssh options you want to specify
 
 # Function to log messages
 log_message() {
