@@ -1,20 +1,27 @@
 #!/bin/bash
 
 # Variables
-REMOTE_USER="username" #Your ssh username
-REMOTE_HOST="HOST_IP" #Your Host IP address
-REMOTE_WEB_DIR="REMOTE_SITE_FILE_PATH" # i.e. /domain/site/sitedirectory this is the whole directory on the remote serever that will be zipped!
-REMOTE_DB1="SITE_DB_NAME" #DB Name, this is the DB that we will create a dump of and that the script downloads
-LOCAL_BACKUP_BASE_DIR="BASE_FILE_PATH_WHERE_YOU_ARE_BACKING_UP_TO" #this is the base local directory where the $BACKUP_DIR is created, your files are stored within the $BACKUP_DIR
-REMOTE_BACKUP_DIR="REMOTE_SITE_FILE_PATH_BASE" #i.e. /domain/site this is the directory on the remote server where your .zip file and the .sql db dump file will be stored
+REMOTE_USER="SSH_USERNAME" #Your ssh username
+REMOTE_HOST="REMOTE_HOST_IP" #Your Host IP address
+SITE_NAME="SITE_NAME"
+REMOTE_WEB_DIR="SITE_DIRECTORY_TO_BE_ZIPPED" # i.e. /path/to/sitedirectory this is the whole directory on the remote serever that will be zipped!
+REMOTE_DB="DATABASE_NAME" #DB Name, this is the DB that we will create a dump of and that the script downloads
+LOCAL_BACKUP_BASE_DIR="LOCAL_BACKUP_BASE_DIR" #this is the base local directory where the ${TRUE_BACKUP_DIR} is created, your files are stored within the ${TRUE_BACKUP_DIR}
+REMOTE_BACKUP_DIR="REMOTE_BACKUP_DIR" #i.e. /remote/backup/path this is the directory on the remote server where your .zip file and the .sql db dump file will be stored
 DATE=$(date +'%Y-%m-%d') #Date 
-BACKUP_DIR="${LOCAL_BACKUP_BASE_DIR}/SITE_BACKUP_${DATE}" #this is the directory that is made by the script where your files will be stored
+TRUE_BACKUP_DIR="${LOCAL_BACKUP_BASE_DIR}/SITE_BACKUP_${DATE}" #this is the directory that is made by the script where your files will be stored
 SSH_PASS="SSH_PASSWORD" #ssh password
-DB_USERNAME="SITE_DB_USERNAME" #DB Username
-DB_PASS="SITE_DB_PASSWORD" #DB Password
-SSH_PORT=SSH_PORT_ #ssh port number
+DB_USERNAME="DATABASE_USERNAME" #DB Username
+DB_PASS="DATABASE_PASSWORD" #DB Password
+SSH_PORT=22 #ssh port number
 LOG_FILE="${LOCAL_BACKUP_BASE_DIR}/backup_log_${DATE}.log" #Log file created by script that logs actions and errors
-SSH_OPTIONS="SSH_OPTIONS -p ${SSH_PORT}" #Any specific ssh options you want to specify
+SSH_OPTIONS="-o StrictHostKeyChecking=no -p ${SSH_PORT}" #Any specific ssh options you want to specify
+ZIP_DIRECTORY_PATH="${REMOTE_BACKUP_DIR}/${SITE_NAME}_${DATE}.zip" #The path of the Zip of the ${REMOTE_WEB_DIR}
+ZIP_FILE="${SITE_NAME}_${DATE}.zip" #The Zip File itself
+DB_DUMP_PATH="${REMOTE_BACKUP_DIR}/${REMOTE_DB}_backup_${DATE}.sql" #The path of the dump of the ${REMOTE_DB}
+DB_DUMP="${REMOTE_DB}_backup_${DATE}.sql" # The Dump file itself
+CHECKSUM_FILE_PATH="${REMOTE_BACKUP_DIR}/checksum-$DATE.sha256" #Path of the Checksum file
+CHECKSUM_FILE="checksum-$DATE.sha256" #The Checksum file generated when generating the checksums of the files, contains 256 hashes for both .zip and dump file
 
 # Function to log messages
 log_message() {
@@ -22,16 +29,16 @@ log_message() {
 }
 
 # Create a new directory for the backup
-log_message "Creating backup directory ${BACKUP_DIR}"
-mkdir -p ${BACKUP_DIR}
+log_message "Creating backup directory ${TRUE_BACKUP_DIR}"
+mkdir -p ${TRUE_BACKUP_DIR}
 if [ $? -ne 0 ]; then
-    log_message "Failed to create backup directory ${BACKUP_DIR}"
+    log_message "Failed to create backup directory ${TRUE_BACKUP_DIR}"
     exit 1
 fi
 
 # SSH into the remote server and zip the website folder
 log_message "Zipping the website folder on the remote server"
-sshpass -p "${SSH_PASS}" ssh ${SSH_OPTIONS} ${REMOTE_USER}@${REMOTE_HOST} "zip -r ${REMOTE_BACKUP_DIR}/website_backup_${DATE}.zip ${REMOTE_WEB_DIR}" &
+sshpass -p "${SSH_PASS}" ssh ${SSH_OPTIONS} ${REMOTE_USER}@${REMOTE_HOST} "zip -r ${ZIP_DIRECTORY_PATH} ${REMOTE_WEB_DIR}" &
 ZIP_PID=$!
 
 wait $ZIP_PID
@@ -42,7 +49,7 @@ fi
 
 # Download the zipped website folder via scp
 log_message "Downloading the zipped website folder"
-sshpass -p "${SSH_PASS}" scp -P ${SSH_PORT} ${REMOTE_USER}@${REMOTE_HOST}:${REMOTE_BACKUP_DIR}/website_backup_${DATE}.zip ${BACKUP_DIR}/ &
+sshpass -p "${SSH_PASS}" scp -P ${SSH_PORT} ${REMOTE_USER}@${REMOTE_HOST}:${ZIP_DIRECTORY_PATH} ${TRUE_BACKUP_DIR}/ &
 SCP_ZIP_PID=$!
 
 wait $SCP_ZIP_PID
@@ -52,11 +59,11 @@ if [ $? -ne 0 ]; then
 fi
 
 # SSH into the remote server and create database dumps
-log_message "Creating database dump for ${REMOTE_DB1}"
-sshpass -p "${SSH_PASS}" ssh ${SSH_OPTIONS} ${REMOTE_USER}@${REMOTE_HOST} "mysqldump -u ${DB_USERNAME} -p'${DB_PASS}' ${REMOTE_DB1} > ${REMOTE_BACKUP_DIR}/${REMOTE_DB1}_backup_${DATE}.sql" &
+log_message "Creating database dump for ${REMOTE_DB}"
+sshpass -p "${SSH_PASS}" ssh ${SSH_OPTIONS} ${REMOTE_USER}@${REMOTE_HOST} "mysqldump -u ${DB_USERNAME} -p'${DB_PASS}' ${REMOTE_DB} > ${DB_DUMP_PATH}" &
 DUMP_DB1_PID=$!
 if [ $? -ne 0 ]; then
-    log_message "Failed to initiate database dump for ${REMOTE_DB1}"
+    log_message "Failed to initiate database dump for ${REMOTE_DB}"
     exit 1
 fi
 
@@ -74,30 +81,58 @@ if [ $? -ne 0 ]; then
 fi
 
 # Download the database dumps via scp
-log_message "Downloading the database dump for ${REMOTE_DB1}"
-sshpass -p "${SSH_PASS}" scp -P ${SSH_PORT} ${REMOTE_USER}@${REMOTE_HOST}:${REMOTE_BACKUP_DIR}/${REMOTE_DB1}_backup_${DATE}.sql ${BACKUP_DIR}/ &
+log_message "Downloading the database dump for ${REMOTE_DB}"
+sshpass -p "${SSH_PASS}" scp -P ${SSH_PORT} ${REMOTE_USER}@${REMOTE_HOST}:${DB_DUMP_PATH} ${TRUE_BACKUP_DIR}/ &
 SCP_DB1_PID=$!
 if [ $? -ne 0 ]; then
-    log_message "Failed to initiate download of the database dump for ${REMOTE_DB1}"
+    log_message "Failed to initiate download of the database dump for ${REMOTE_DB}"
     exit 1
 fi
 
 # Wait for all background processes to complete
 wait $DUMP_DB1_PID
 if [ $? -ne 0 ]; then
-    log_message "Database dump for ${REMOTE_DB1} failed"
+    log_message "Database dump for ${REMOTE_DB} failed"
     exit 1
 fi
 
 wait $SCP_DB1_PID
 if [ $? -ne 0 ]; then
-    log_message "Downloading the database dump for ${REMOTE_DB1} failed"
+    log_message "Downloading the database dump for ${REMOTE_DB} failed"
     exit 1
 fi
 
+#Generate Checksums of the Zip File and the Dump
+sshpass -p "${SSH_PASS}" ssh ${SSH_OPTIONS} ${REMOTE_USER}@${REMOTE_HOST} "cd ${REMOTE_BACKUP_DIR} && sha256sum ${ZIP_FILE} ${DB_DUMP} > ${CHECKSUM_FILE}"
+CHECK_PID=$!
+
+wait $CHECK_PID
+if [ $? -ne 0 ]; then
+    log_message "Failed to initiate checksum"
+    exit 1
+fi
+
+sshpass -p "${SSH_PASS}" scp -P ${SSH_PORT} ${REMOTE_USER}@${REMOTE_HOST}:${CHECKSUM_FILE_PATH} ${TRUE_BACKUP_DIR} &
+SCP_CHECK_PID=$!
+
+wait $SCP_CHECK_PID
+if [ $? -ne 0 ]; then
+    log_message "Failed to Download Checksum file"
+    exit 1
+fi
+
+cd ${TRUE_BACKUP_DIR}
+sha256sum -c ${CHECKSUM_FILE}
+
+if [ $? -eq 0 ]; then
 # Optional: Remove the backups from the remote server
 log_message "Removing the backups from the remote server"
-sshpass -p "${SSH_PASS}" ssh -p ${SSH_PORT} ${REMOTE_USER}@${REMOTE_HOST} "rm ${REMOTE_BACKUP_DIR}/website_backup_${DATE}.zip"
-sshpass -p "${SSH_PASS}" ssh -p ${SSH_PORT} ${REMOTE_USER}@${REMOTE_HOST} "rm ${REMOTE_BACKUP_DIR}/${REMOTE_DB1}_backup_${DATE}.sql"
+sshpass -p "${SSH_PASS}" ssh -p ${SSH_PORT} ${REMOTE_USER}@${REMOTE_HOST} "rm ${ZIP_DIRECTORY_PATH} ${DB_DUMP_PATH} ${CHECKSUM_FILE_PATH}"
 
-log_message "Backup completed and stored in ${BACKUP_DIR} on ${DATE}"
+log_message "Backup completed and stored in ${TRUE_BACKUP_DIR} on ${DATE}"
+
+else
+  echo "Checksum verification failed. Please check the files."
+  exit 1
+fi
+
