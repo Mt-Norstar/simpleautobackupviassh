@@ -9,7 +9,7 @@ REMOTE_DB="DATABASE_NAME" #DB Name, this is the DB that we will create a dump of
 LOCAL_BACKUP_BASE_DIR="LOCAL_BACKUP_BASE_DIR" #this is the base local directory where the ${TRUE_BACKUP_DIR} is created, your files are stored within the ${TRUE_BACKUP_DIR}
 REMOTE_BACKUP_DIR="REMOTE_BACKUP_DIR" #i.e. /remote/backup/path this is the directory on the remote server where your .zip file and the .sql db dump file will be stored
 DATE=$(date +'%Y-%m-%d') #Date 
-TRUE_BACKUP_DIR="${LOCAL_BACKUP_BASE_DIR}/SITE_BACKUP_${DATE}" #this is the directory that is made by the script where your files will be stored
+TRUE_BACKUP_DIR="${LOCAL_BACKUP_BASE_DIR}/${SITE_NAME}_BACKUP_${DATE}" #this is the directory that is made by the script where your files will be stored
 SSH_PASS="SSH_PASSWORD" #ssh password
 DB_USERNAME="DATABASE_USERNAME" #DB Username
 DB_PASS="DATABASE_PASSWORD" #DB Password
@@ -20,8 +20,8 @@ ZIP_DIRECTORY_PATH="${REMOTE_BACKUP_DIR}/${SITE_NAME}_${DATE}.zip" #The path of 
 ZIP_FILE="${SITE_NAME}_${DATE}.zip" #The Zip File itself
 DB_DUMP_PATH="${REMOTE_BACKUP_DIR}/${REMOTE_DB}_backup_${DATE}.sql" #The path of the dump of the ${REMOTE_DB}
 DB_DUMP="${REMOTE_DB}_backup_${DATE}.sql" # The Dump file itself
-CHECKSUM_FILE_PATH="${REMOTE_BACKUP_DIR}/checksum-$DATE.sha256" #Path of the Checksum file
-CHECKSUM_FILE="checksum-$DATE.sha256" #The Checksum file generated when generating the checksums of the files, contains 256 hashes for both .zip and dump file
+CHECKSUM_FILE_PATH="${REMOTE_BACKUP_DIR}/${SITE_NAME}-checksum-$DATE.sha256" #Path of the Checksum file
+CHECKSUM_FILE="${SITE_NAME}-checksum-$DATE.sha256" #The Checksum file generated when generating the checksums of the files, contains 256 hashes for both .zip and dump file
 
 # Function to log messages
 log_message() {
