@@ -14,7 +14,7 @@ SSH_PASS="SSH_PASSWORD" #ssh password
 DB_USERNAME="DATABASE_USERNAME" #DB Username
 DB_PASS="DATABASE_PASSWORD" #DB Password
 SSH_PORT=22 #ssh port number
-LOG_FILE="${LOCAL_BACKUP_BASE_DIR}/backup_log_${DATE}.log" #Log file created by script that logs actions and errors
+LOG_FILE="${LOCAL_BACKUP_BASE_DIR}/${SITE_NAME}_backup_log_${DATE}.log" #Log file created by script that logs actions and errors
 SSH_OPTIONS="-o StrictHostKeyChecking=no -p ${SSH_PORT}" #Any specific ssh options you want to specify
 ZIP_DIRECTORY_PATH="${REMOTE_BACKUP_DIR}/${SITE_NAME}_${DATE}.zip" #The path of the Zip of the ${REMOTE_WEB_DIR}
 ZIP_FILE="${SITE_NAME}_${DATE}.zip" #The Zip File itself
