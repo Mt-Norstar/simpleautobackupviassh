@@ -43,18 +43,15 @@ ZIP_PID=$!
 
 wait $ZIP_PID
 if [ $? -ne 0 ]; then
-    log_message "Failed to initiate zipping the website folder on the remote server"
+    log_message "Failed to zip the website folder on the remote server"
     exit 1
 fi
 
 # Download the zipped website folder via scp
 log_message "Downloading the zipped website folder"
-sshpass -p "${SSH_PASS}" scp -P ${SSH_PORT} ${REMOTE_USER}@${REMOTE_HOST}:${ZIP_DIRECTORY_PATH} ${TRUE_BACKUP_DIR}/ &
-SCP_ZIP_PID=$!
-
-wait $SCP_ZIP_PID
+sshpass -p "${SSH_PASS}" scp -P ${SSH_PORT} ${REMOTE_USER}@${REMOTE_HOST}:${ZIP_DIRECTORY_PATH} ${TRUE_BACKUP_DIR}/
 if [ $? -ne 0 ]; then
-    log_message "Failed to initiate download of the zipped website folder"
+    log_message "Failed to download the zipped website folder"
     exit 1
 fi
 
@@ -62,77 +59,51 @@ fi
 log_message "Creating database dump for ${REMOTE_DB}"
 sshpass -p "${SSH_PASS}" ssh ${SSH_OPTIONS} ${REMOTE_USER}@${REMOTE_HOST} "mysqldump -u ${DB_USERNAME} -p'${DB_PASS}' ${REMOTE_DB} > ${DB_DUMP_PATH}" &
 DUMP_DB1_PID=$!
-if [ $? -ne 0 ]; then
-    log_message "Failed to initiate database dump for ${REMOTE_DB}"
-    exit 1
-fi
 
-# Wait for the zipping and downloading to complete
-wait $ZIP_PID
-if [ $? -ne 0 ]; then
-    log_message "Zipping the website folder failed"
-    exit 1
-fi
-
-wait $SCP_ZIP_PID
-if [ $? -ne 0 ]; then
-    log_message "Downloading the zipped website folder failed"
-    exit 1
-fi
-
-# Download the database dumps via scp
-log_message "Downloading the database dump for ${REMOTE_DB}"
-sshpass -p "${SSH_PASS}" scp -P ${SSH_PORT} ${REMOTE_USER}@${REMOTE_HOST}:${DB_DUMP_PATH} ${TRUE_BACKUP_DIR}/ &
-SCP_DB1_PID=$!
-if [ $? -ne 0 ]; then
-    log_message "Failed to initiate download of the database dump for ${REMOTE_DB}"
-    exit 1
-fi
-
-# Wait for all background processes to complete
 wait $DUMP_DB1_PID
 if [ $? -ne 0 ]; then
     log_message "Database dump for ${REMOTE_DB} failed"
     exit 1
 fi
 
-wait $SCP_DB1_PID
+# Download the database dumps via scp
+log_message "Downloading the database dump for ${REMOTE_DB}"
+sshpass -p "${SSH_PASS}" scp -P ${SSH_PORT} ${REMOTE_USER}@${REMOTE_HOST}:${DB_DUMP_PATH} ${TRUE_BACKUP_DIR}/
 if [ $? -ne 0 ]; then
-    log_message "Downloading the database dump for ${REMOTE_DB} failed"
+    log_message "Failed to download the database dump for ${REMOTE_DB}"
     exit 1
 fi
 
-#Generate Checksums of the Zip File and the Dump
-sshpass -p "${SSH_PASS}" ssh ${SSH_OPTIONS} ${REMOTE_USER}@${REMOTE_HOST} "cd ${REMOTE_BACKUP_DIR} && sha256sum ${ZIP_FILE} ${DB_DUMP} > ${CHECKSUM_FILE}"
+# Generate Checksums of the Zip File and the Dump
+log_message "Generating checksum for the backup files"
+sshpass -p "${SSH_PASS}" ssh ${SSH_OPTIONS} ${REMOTE_USER}@${REMOTE_HOST} "cd ${REMOTE_BACKUP_DIR} && sha256sum ${ZIP_FILE} ${DB_DUMP} > ${CHECKSUM_FILE}" &
 CHECK_PID=$!
 
 wait $CHECK_PID
 if [ $? -ne 0 ]; then
-    log_message "Failed to initiate checksum"
+    log_message "Failed to generate checksum"
     exit 1
 fi
 
-sshpass -p "${SSH_PASS}" scp -P ${SSH_PORT} ${REMOTE_USER}@${REMOTE_HOST}:${CHECKSUM_FILE_PATH} ${TRUE_BACKUP_DIR} &
-SCP_CHECK_PID=$!
-
-wait $SCP_CHECK_PID
+log_message "Downloading the checksum file"
+sshpass -p "${SSH_PASS}" scp -P ${SSH_PORT} ${REMOTE_USER}@${REMOTE_HOST}:${CHECKSUM_FILE_PATH} ${TRUE_BACKUP_DIR}
 if [ $? -ne 0 ]; then
-    log_message "Failed to Download Checksum file"
+    log_message "Failed to download the checksum file"
     exit 1
 fi
 
 cd ${TRUE_BACKUP_DIR}
+log_message "Verifying checksum"
 sha256sum -c ${CHECKSUM_FILE}
-
 if [ $? -eq 0 ]; then
-# Optional: Remove the backups from the remote server
-log_message "Removing the backups from the remote server"
-sshpass -p "${SSH_PASS}" ssh -p ${SSH_PORT} ${REMOTE_USER}@${REMOTE_HOST} "rm ${ZIP_DIRECTORY_PATH} ${DB_DUMP_PATH} ${CHECKSUM_FILE_PATH}"
+    log_message "Checksum verification succeeded"
 
-log_message "Backup completed and stored in ${TRUE_BACKUP_DIR} on ${DATE}"
+    # Optional: Remove the backups from the remote server
+    log_message "Removing the backups from the remote server"
+    sshpass -p "${SSH_PASS}" ssh -p ${SSH_PORT} ${REMOTE_USER}@${REMOTE_HOST} "rm ${ZIP_DIRECTORY_PATH} ${DB_DUMP_PATH} ${CHECKSUM_FILE_PATH}"
 
+    log_message "Backup completed and stored in ${TRUE_BACKUP_DIR} on $(date)"
 else
-  echo "Checksum verification failed. Please check the files."
-  exit 1
+    log_message "Checksum verification failed. Please check the files."
+    exit 1
 fi
-
